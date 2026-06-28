@@ -1,0 +1,48 @@
+# === Genel ===
+.DS_Store
+*.log
+*.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+*.iml
+
+# === Backend (Java / Spring Boot / Gradle / Maven) ===
+backend/build/
+backend/target/
+backend/.gradle/
+backend/out/
+backend/bin/
+*.class
+
+# === Web (Node / Vite / React) ===
+web/node_modules/
+web/dist/
+web/.vite/
+web/coverage/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# === Android (Kotlin / Gradle) ===
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.cxx/
+*.apk
+*.aab
+*.keystore
+
+# === iOS (Swift / Xcode) ===
+ios/build/
+ios/DerivedData/
+ios/Pods/
+*.xcuserstate
+xcuserdata/
+
+# === Infra / Docker ===
+infra/**/.terraform/
+*.tfstate
+*.tfstate.*
