@@ -1,0 +1,44 @@
+# Docker Compose — lokal geliştirme altyapısı
+# "docker compose up" deyince buradaki tüm servisler birlikte ayağa kalkar.
+# Şimdilik 2 servis var: PostgreSQL (kalıcı veri) ve Redis (hızlı/geçici).
+# Spring Boot backend'i Adım 3'ten sonra buraya ekleyeceğiz.
+
+services:
+  # --- PostgreSQL: kalıcı veritabanı (source of truth) ---
+  postgres:
+    image: postgres:16              # Docker Hub'dan hazır PostgreSQL 16 imajı
+    container_name: commerce-postgres
+    restart: unless-stopped         # çökerse otomatik yeniden başlat
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}             # oluşturulacak veritabanı adı
+      POSTGRES_USER: ${POSTGRES_USER}         # veritabanı kullanıcısı
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # kullanıcının parolası
+    ports:
+      - "5432:5432"                 # bilgisayarındaki 5432 -> kutudaki 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # veriyi kalıcı sakla
+    healthcheck:                    # "veritabanı hazır mı?" kontrolü
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Redis: hızlı önbellek / oturum / kilit (geçici) ---
+  redis:
+    image: redis:7                  # hazır Redis 7 imajı
+    container_name: commerce-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"                 # Redis'in standart portu
+    volumes:
+      - redis_data:/data            # istenirse veriyi kalıcı sakla
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]   # "PONG" dönerse ayakta
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Docker'ın yönettiği kalıcı disk alanları (kutu silinse de veri durur)
+volumes:
+  postgres_data:
+  redis_data:
