@@ -50,6 +50,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+		<!-- Spring Security: kimlik doğrulama, yetki, parola hashing (BCrypt) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
 		<!-- Swagger / OpenAPI: /swagger-ui.html arayüzünü sağlar -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
