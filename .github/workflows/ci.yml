@@ -1,0 +1,51 @@
+# GitHub Actions CI — her push ve PR'da backend'i derleyip test eder.
+# Amaç: kod bozuksa PR'da kırmızı yansın, sağlamsa yeşil.
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:          # her PR'da çalışır
+
+jobs:
+  backend-build-test:
+    runs-on: ubuntu-latest   # GitHub'ın sağladığı Linux makinesi
+
+    # Testler PostgreSQL + Redis ister; CI bunları "servis kutusu" olarak sağlar.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: commerce
+          POSTGRES_USER: commerce
+          POSTGRES_PASSWORD: commerce_local_dev   # application.properties'teki varsayılanla aynı
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U commerce -d commerce"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      # 1) Kodu CI makinesine indir
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2) Java 17'yi kur (Maven bağımlılıklarını önbelleğe al)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # 3) Derle + test et (backend/ klasöründe)
+      - name: Build & test
+        working-directory: backend
+        run: ./mvnw -B clean verify
