@@ -1,6 +1,7 @@
 package com.commerce.backend.service;
 
 import com.commerce.backend.domain.User;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,11 +18,9 @@ public class JwtService {
     private final SecretKey key;
     private final long expirationMs;
 
-    // Ayar dosyasındaki app.jwt.* değerlerini @Value ile buraya alıyoruz
     public JwtService(
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.expiration-ms}") long expirationMs) {
-        // Gizli metni, imzalamaya uygun bir anahtara çeviriyoruz
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
     }
@@ -31,18 +30,27 @@ public class JwtService {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
-        // Rolleri "USER,ADMIN" gibi tek metne çeviriyoruz
         String roles = user.getRoles().stream()
                 .map(role -> role.getName())
                 .collect(Collectors.joining(","));
 
         return Jwts.builder()
-                .subject(user.getEmail())     // PAYLOAD: jetonun sahibi (kim)
-                .claim("uid", user.getId())   // PAYLOAD: kullanıcı id
-                .claim("roles", roles)        // PAYLOAD: roller
-                .issuedAt(now)                // ne zaman üretildi
-                .expiration(expiry)           // ne zaman geçersiz olacak
-                .signWith(key)                // SIGNATURE: gizli anahtarla imzala
-                .compact();                   // hepsini xxx.yyy.zzz metnine çevir
+                .subject(user.getEmail())
+                .claim("uid", user.getId())
+                .claim("roles", roles)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(key)
+                .compact();
+    }
+
+    // YENİ: jetonu doğrular ve içindeki bilgileri (claims) döndürür.
+    // İmza tutmazsa veya süresi dolmuşsa istisna (exception) fırlatır.
+    public Claims parse(String token) {
+        return Jwts.parser()
+                .verifyWith(key)              // gizli anahtarla imzayı DOĞRULA
+                .build()
+                .parseSignedClaims(token)     // jetonu çöz (imza + süre kontrol edilir)
+                .getPayload();                // payload'ı (sub, roles, exp...) döndür
     }
 }

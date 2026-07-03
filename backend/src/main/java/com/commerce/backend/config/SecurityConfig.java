@@ -3,28 +3,40 @@ package com.commerce.backend.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-@Configuration   // "Bu sınıf ayar (bean tanımı) içerir"
+@Configuration
 public class SecurityConfig {
 
-    // Parola hash aracı. Uygulamanın her yerinde bunu enjekte edip kullanacağız.
+    private final JwtAuthFilter jwtAuthFilter;
+
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+        this.jwtAuthFilter = jwtAuthFilter;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Güvenlik zinciri: gelen her isteğin nasıl karşılanacağını belirler.
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // REST/JSON API olduğumuz için CSRF korumasını kapatıyoruz
-                // (CSRF daha çok tarayıcı-form tabanlı oturumlar için gerekli).
                 .csrf(csrf -> csrf.disable())
-                // ŞİMDİLİK: her isteğe izin ver. JWT hazır olunca burayı sıkacağız.
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+                // Jeton kullandığımız için sunucuda oturum TUTMUYORUZ (stateless)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        // Herkese açık uçlar (jeton gerekmez):
+                        .requestMatchers("/auth/**", "/ping").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/health").permitAll()
+                        // Geri kalan HER ŞEY geçerli jeton ister:
+                        .anyRequest().authenticated())
+                // Kendi JWT filtremizi Spring'in giriş filtresinden ÖNCE çalıştır
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }
