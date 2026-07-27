@@ -2,6 +2,7 @@ package com.commerce.backend.web;
 
 import com.commerce.backend.service.AuthService;
 import com.commerce.backend.web.dto.LoginRequest;
+import com.commerce.backend.web.dto.RefreshRequest;
 import com.commerce.backend.web.dto.RegisterRequest;
 import com.commerce.backend.web.dto.TokenResponse;
 import jakarta.validation.Valid;
@@ -29,10 +30,22 @@ public class AuthController {
         authService.register(request);
     }
 
-    // POST /auth/login  ->  jeton döner
+    // POST /auth/login  ->  access + refresh token döner
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest request) {
-        String token = authService.login(request);   // servisten jetonu al
-        return new TokenResponse(token);              // {"accessToken": "xxx.yyy.zzz"}
+        return authService.login(request);
+    }
+
+    // POST /auth/refresh  ->  geçerli refresh token'la yeni bir jeton çifti al
+    @PostMapping("/refresh")
+    public TokenResponse refresh(@Valid @RequestBody RefreshRequest request) {
+        return authService.refresh(request);
+    }
+
+    // POST /auth/logout  ->  refresh token'ı iptal eder (204: içerik yok)
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@Valid @RequestBody RefreshRequest request) {
+        authService.logout(request);
     }
 }

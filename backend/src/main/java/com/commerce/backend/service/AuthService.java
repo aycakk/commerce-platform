@@ -5,7 +5,9 @@ import com.commerce.backend.domain.User;
 import com.commerce.backend.repository.RoleRepository;
 import com.commerce.backend.repository.UserRepository;
 import com.commerce.backend.web.dto.LoginRequest;
+import com.commerce.backend.web.dto.RefreshRequest;
 import com.commerce.backend.web.dto.RegisterRequest;
+import com.commerce.backend.web.dto.TokenResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,16 +19,19 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;   // YENİ: jeton üretici
+    private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;   // YENİ
 
     public AuthService(UserRepository userRepository,
                        RoleRepository roleRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public void register(RegisterRequest request) {
@@ -50,19 +55,46 @@ public class AuthService {
         userRepository.save(user);
     }
 
-    // YENİ: giriş yap, doğruysa JWT dön
-    public String login(LoginRequest request) {
-        // 1) Email'e göre kullanıcıyı bul. Yoksa 401.
+    // Giriş yap: doğruysa hem access hem refresh token dön.
+    public TokenResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "Email veya parola hatalı"));
 
-        // 2) Parola doğru mu? BCrypt ile karşılaştır. Yanlışsa 401.
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email veya parola hatalı");
         }
 
-        // 3) Doğruysa jeton üret ve dön.
-        return jwtService.generateToken(user);
+        String accessToken = jwtService.generateToken(user);
+        String refreshToken = refreshTokenService.create(user.getEmail());
+        return new TokenResponse(accessToken, refreshToken);
+    }
+
+    // YENİ: geçerli bir refresh token'la yeni bir jeton çifti al.
+    // Rotation: eski refresh token HEMEN iptal edilir, yerine yenisi verilir.
+    // Böylece bir refresh token en fazla bir kez kullanılabilir - çalınmışsa
+    // gerçek sahibi onu tekrar kullanmaya çalışınca (zaten iptal olduğu için)
+    // başarısız olur ve bu durumu fark edebilir.
+    public TokenResponse refresh(RefreshRequest request) {
+        String email = refreshTokenService.resolveEmail(request.refreshToken());
+        if (email == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Refresh token geçersiz veya süresi dolmuş");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Kullanıcı bulunamadı"));
+
+        refreshTokenService.revoke(request.refreshToken());   // eskisini iptal et (rotation)
+
+        String newAccessToken = jwtService.generateToken(user);
+        String newRefreshToken = refreshTokenService.create(user.getEmail());
+        return new TokenResponse(newAccessToken, newRefreshToken);
+    }
+
+    // YENİ: çıkış yap - refresh token'ı Redis'ten sil, bir daha kullanılamasın.
+    public void logout(RefreshRequest request) {
+        refreshTokenService.revoke(request.refreshToken());
     }
 }
